@@ -104,8 +104,10 @@ trait RequestInputTrait
         fclose($putdata);
 
         $put = $this->parseQueryParams($putString);
+        $all = array_merge($query, $post, $put, $files);
+        $collect = array_map(fn ($i) => urldecode($i), $all);
 
-        return new Collection(array_merge($query, $post, $put, $files));
+        return new Collection($collect);
     }
 
     /**
