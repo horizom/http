@@ -19,6 +19,11 @@ final class Request extends \Nyholm\Psr7\ServerRequest
     /**
      * @var string
      */
+    private $request_path;
+
+    /**
+     * @var string
+     */
     private $base_url;
 
     /**
