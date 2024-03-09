@@ -5,9 +5,10 @@ namespace Horizom\Http;
 use Horizom\Http\Exceptions\HttpException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
+use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 
-final class Request extends \Nyholm\Psr7\ServerRequest
+class Request extends \Nyholm\Psr7\ServerRequest
 {
     use RequestInputTrait;
 
@@ -19,7 +20,7 @@ final class Request extends \Nyholm\Psr7\ServerRequest
     /**
      * @var string
      */
-    private $request_path;
+    private $uriPath;
 
     /**
      * @var string
@@ -75,20 +76,19 @@ final class Request extends \Nyholm\Psr7\ServerRequest
         $request_uri = $uri->getPath();
 
         $this->base_path = $basePath;
-        $this->request_path = str_replace($basePath, '', $uri->getPath());
+        $this->uriPath = str_replace($basePath, '', $uri->getPath());
         $this->base_url = $uri->getScheme() . '://' . $base_uri;
         $this->full_url = $this->url = $uri->getScheme() . '://' . $host . $request_uri;
 
         if ($query) {
             $this->full_url = $this->full_url . '?' . $query;
         }
-
-        define("HORIZOM_BASE_PATH", $this->base_path);
-        define("HORIZOM_BASE_URL", $this->base_url);
     }
 
     /**
      * Create new Request
+     *
+     * @return static
      */
     public static function create()
     {
@@ -98,7 +98,7 @@ final class Request extends \Nyholm\Psr7\ServerRequest
         $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
         $protocol = isset($_SERVER['SERVER_PROTOCOL']) ? str_replace('HTTP/', '', $_SERVER['SERVER_PROTOCOL']) : '1.1';
 
-        return new Request($method, $uri, $headers, $body, $protocol, $_SERVER);
+        return new self($method, $uri, $headers, $body, $protocol, $_SERVER);
     }
 
     /**
@@ -193,7 +193,7 @@ final class Request extends \Nyholm\Psr7\ServerRequest
     public function is(...$patterns)
     {
         foreach ($patterns as $pattern) {
-            if (Str::is($pattern, $this->request_path)) {
+            if (Str::is($pattern, $this->uriPath)) {
                 return true;
             }
         }
@@ -259,7 +259,10 @@ final class Request extends \Nyholm\Psr7\ServerRequest
         }
 
         return sha1(implode('|', [
-            $this->getMethod(), $this->root(), $this->path(), $this->ip(),
+            $this->getMethod(),
+            $this->root(),
+            $this->path(),
+            $this->ip(),
         ]));
     }
 
@@ -312,7 +315,7 @@ final class Request extends \Nyholm\Psr7\ServerRequest
      */
     public function pjax()
     {
-        return $this->getHeader('X-PJAX') == true;
+        return $this->header('X-PJAX') == true;
     }
 
     /**
@@ -329,6 +332,32 @@ final class Request extends \Nyholm\Psr7\ServerRequest
         }
 
         return $isXhr;
+    }
+
+    public function isJson()
+    {
+        return $this->header('content-type') === 'application/json';
+    }
+
+    public function isHtml()
+    {
+        return $this->header('content-type') === 'text/html';
+    }
+
+    public function wantsJson()
+    {
+        $accept = $this->header('accept');
+
+        if (empty($accept)) {
+            return false;
+        }
+
+        return strpos($accept, 'application/json') !== false;
+    }
+
+    public function exceptJson()
+    {
+        return !$this->wantsJson();
     }
 
     /**

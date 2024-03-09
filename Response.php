@@ -4,14 +4,13 @@ namespace Horizom\Http;
 
 use Horizom\Http\Exceptions\HttpException;
 use Nyholm\Psr7\Factory\Psr17Factory;
-use Nyholm\Psr7\Response as BaseResponse;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 use Psr\Http\Message\ResponseFactoryInterface;
 use InvalidArgumentException;
 
-final class Response extends BaseResponse
+class Response extends \Nyholm\Psr7\Response
 {
     /**
      * @var ResponseFactoryInterface
@@ -38,15 +37,23 @@ final class Response extends BaseResponse
         self::$factory = new Psr17Factory();
     }
 
-    public static function create()
+    /**
+     * Create new response
+     *
+     * @return static
+     */
+    public static function create($status = 200, array $headers = [], $body = null, $version = '1.1', $reason = null)
     {
-        return self::$factory->createResponse();
+        return new self($status, $headers, $body, $version, $reason);
     }
 
     /**
      * Create new response from instance
+     *
+     * @param ResponseInterface $response
+     * @return static
      */
-    public static function fromInstance(ResponseInterface $response): self
+    public static function fromInstance(ResponseInterface $response)
     {
         $status = $response->getStatusCode();
         $headers = $response->getHeaders();
@@ -54,7 +61,7 @@ final class Response extends BaseResponse
         $version = $response->getProtocolVersion();
         $reason = $response->getReasonPhrase();
 
-        return new Response($status, $headers, $body, $version, $reason);
+        return new self($status, $headers, $body, $version, $reason);
     }
 
     /**
@@ -92,12 +99,7 @@ final class Response extends BaseResponse
      */
     public function view(string $name, array $data = [], $contentType = 'text/html'): ResponseInterface
     {
-        if (class_exists('\Horizom\Core\View')) {
-            $content = (string) (new \Horizom\Core\View())->make($name, $data)->render();
-        } else {
-            throw new \RuntimeException("View library not found.", 1);
-        }
-
+        $content = (string) \Horizom\Core\Facades\View::make($name, $data)->render();
         $body = self::$factory->createStream($content);
         $response = clone $this;
 
@@ -195,7 +197,7 @@ final class Response extends BaseResponse
         } else {
             throw new InvalidArgumentException(
                 'Parameter 1 of Response::withFile() must be a resource, a string ' .
-                    'or an instance of Psr\Http\Message\StreamInterface.'
+                'or an instance of Psr\Http\Message\StreamInterface.'
             );
         }
 

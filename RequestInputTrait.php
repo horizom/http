@@ -11,7 +11,7 @@ trait RequestInputTrait
     /**
      * Access all of the user POST input
      *
-     * @return mixed|Collection
+     * @return mixed
      */
     public function post(string $name = null, $default = null)
     {
@@ -81,7 +81,7 @@ trait RequestInputTrait
      */
     public function server(string $name = null, $default = null)
     {
-        $server =  new ServerCollection($_SERVER);
+        $server = new ServerCollection($_SERVER);
 
         if ($name) {
             return $server->get($name, $default);
@@ -105,7 +105,7 @@ trait RequestInputTrait
 
         $put = $this->parseQueryParams($putString);
         $all = array_merge($query, $post, $put, $files);
-        $collect = array_map(fn ($i) => urldecode($i), $all);
+        $collect = array_map(fn($i) => urldecode($i), $all);
 
         return new Collection($collect);
     }
@@ -121,15 +121,15 @@ trait RequestInputTrait
     /**
      * Retrieve a single input item from the request.
      */
-    public function input($key = null, $default = null)
+    public function input($id = null, $default = null)
     {
         $input = $this->collect();
 
-        if (is_null($key)) {
+        if (is_null($id)) {
             return $input->all();
         }
 
-        return $input->get($key, $default);
+        return $input->get($id, $default);
     }
 
     /**
