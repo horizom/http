@@ -62,7 +62,7 @@ class Request extends \Nyholm\Psr7\ServerRequest
      */
     private function initialize($uri)
     {
-        $basePath = config('app.base_path');
+        $basePath = env('APP_BASE_PATH', '');
         $path = trim($basePath, '/');
         $host = $uri->getHost();
         $port = $uri->getPort();
@@ -250,7 +250,7 @@ class Request extends \Nyholm\Psr7\ServerRequest
      * Get a unique fingerprint for the request / route / IP address.
      *
      * @return string
-     * @throws \HttpException
+     * @throws \Horizom\Http\Exceptions\HttpException
      */
     public function fingerprint()
     {
@@ -315,7 +315,7 @@ class Request extends \Nyholm\Psr7\ServerRequest
      */
     public function pjax()
     {
-        return $this->header('X-PJAX') == true;
+        return (bool) $this->header('X-PJAX');
     }
 
     /**

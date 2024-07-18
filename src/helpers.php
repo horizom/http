@@ -24,7 +24,7 @@ if (!function_exists('response')) {
 if (!function_exists('request')) {
     /**
      * Create new Request instance
-     * 
+     *
      * @param string|null $method
      * @param string|UriInterface|null $uri
      * @param array $headers
