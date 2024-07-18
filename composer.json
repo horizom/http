@@ -34,10 +34,10 @@
   },
   "autoload": {
     "files": [
-      "helpers.php"
+      "src/helpers.php"
     ],
     "psr-4": {
-      "Horizom\\Http\\": ""
+      "Horizom\\Http\\": "src/"
     }
   },
   "suggest": {
