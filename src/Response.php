@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http;
 
 use Horizom\Http\Exceptions\HttpException;
@@ -22,6 +24,8 @@ class Response extends \Nyholm\Psr7\Response
      */
     protected $streamFactory;
 
+    protected string $baseUrl = '';
+
     /**
      * @var Psr17Factory
      */
@@ -30,11 +34,12 @@ class Response extends \Nyholm\Psr7\Response
     /**
      * @inherit
      */
-    public function __construct($status = 200, array $headers = [], $body = null, $version = '1.1', $reason = null)
+    public function __construct(int $status = 200, array $headers = [], $body = null, string $version = '1.1', ?string $reason = null)
     {
         parent::__construct($status, $headers, $body, $version, $reason);
 
         self::$factory = new Psr17Factory();
+        $this->baseUrl = defined('HORIZOM_BASE_URL') ? HORIZOM_BASE_URL : '';
     }
 
     /**
@@ -42,7 +47,7 @@ class Response extends \Nyholm\Psr7\Response
      *
      * @return static
      */
-    public static function create($status = 200, array $headers = [], $body = null, $version = '1.1', $reason = null)
+    public static function create(int $status = 200, array $headers = [], $body = null, string $version = '1.1', ?string $reason = null): static
     {
         return new self($status, $headers, $body, $version, $reason);
     }
@@ -53,7 +58,7 @@ class Response extends \Nyholm\Psr7\Response
      * @param ResponseInterface $response
      * @return static
      */
-    public static function fromInstance(ResponseInterface $response)
+    public static function fromInstance(ResponseInterface $response): static
     {
         $status = $response->getStatusCode();
         $headers = $response->getHeaders();
@@ -62,6 +67,21 @@ class Response extends \Nyholm\Psr7\Response
         $reason = $response->getReasonPhrase();
 
         return new self($status, $headers, $body, $version, $reason);
+    }
+
+    /**
+     * Set the base URL
+     *
+     * This method allows you to specify a base URL that will be used when generating redirect responses.
+     * If a relative URL is provided to the redirect methods, it will be prefixed with this base URL.
+     *
+     * @param string $baseUrl The base URL to set for redirects.
+     * @return $this
+     */
+    public function setBaseUrl(string $baseUrl): static
+    {
+        $this->baseUrl = $baseUrl;
+        return $this;
     }
 
     /**
@@ -75,8 +95,8 @@ class Response extends \Nyholm\Psr7\Response
      */
     public function redirect(string $url, ?int $status = null): ResponseInterface
     {
-        $status = ($status === null) ? 302 : $status;
-        return self::create()->withHeader('Location', $url)->withStatus($status);
+        $status = $status ?? 302;
+        return static::create()->withHeader('Location', $url)->withStatus($status);
     }
 
     /**
@@ -90,7 +110,7 @@ class Response extends \Nyholm\Psr7\Response
      */
     public function redirectWithBaseUrl($url = null, int $status = null): ResponseInterface
     {
-        $url = (is_null($url)) ? HORIZOM_BASE_URL : HORIZOM_BASE_URL . '/' . trim($url, '/');
+        $url = (is_null($url)) ? $this->baseUrl : $this->baseUrl . '/' . trim($url, '/');
         return $this->redirect($url, $status);
     }
 
@@ -107,17 +127,17 @@ class Response extends \Nyholm\Psr7\Response
     }
 
     /**
-     * Write JSON to Response Body.
+     * Write JSON to the response body.
      *
-     * This method prepares the response object to return an HTTP Json
-     * response to the client.
+     * @param mixed $data
+     * @throws HttpException if the data cannot be JSON-encoded
      */
     public function json($data, ?int $status = null, int $options = 0, int $depth = 512): ResponseInterface
     {
-        $json = (string) json_encode($data, $options, $depth);
-
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new HttpException(json_last_error_msg(), json_last_error());
+        try {
+            $json = json_encode($data, $options | JSON_THROW_ON_ERROR, $depth);
+        } catch (\JsonException $e) {
+            throw new HttpException($e->getMessage(), $e->getCode(), $e);
         }
 
         $new = clone $this;
@@ -171,9 +191,8 @@ class Response extends \Nyholm\Psr7\Response
         }
 
         $response = clone $this;
-        $response->file($file, $contentType)->withHeader('Content-Disposition', $disposition);
 
-        return $response;
+        return $response->file($file, $contentType)->withHeader('Content-Disposition', $disposition);
     }
 
     /**

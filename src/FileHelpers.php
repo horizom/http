@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http;
 
 use Illuminate\Support\Str;
@@ -18,9 +20,9 @@ trait FileHelpers
      *
      * @return string
      */
-    public function path()
+    public function path(): string
     {
-        return $this->getRealPath();
+        return $this->getRealPath() ?: '';
     }
 
     /**
@@ -28,9 +30,9 @@ trait FileHelpers
      *
      * @return string
      */
-    public function extension()
+    public function extension(): string
     {
-        return $this->guessExtension();
+        return $this->guessExtension() ?? '';
     }
 
     /**
@@ -39,7 +41,7 @@ trait FileHelpers
      * @param  string|null  $path
      * @return string
      */
-    public function hashName($path = null)
+    public function hashName(?string $path = null): string
     {
         if ($path) {
             $path = rtrim($path, '/') . '/';

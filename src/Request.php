@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http;
 
 use Horizom\Http\Exceptions\HttpException;
@@ -12,164 +14,165 @@ class Request extends \Nyholm\Psr7\ServerRequest
 {
     use RequestInputTrait;
 
-    /**
-     * @var string
-     */
-    private $base_path;
+    private string $basePath = '';
 
-    /**
-     * @var string
-     */
-    private $uriPath;
+    private string $uriPath = '';
 
-    /**
-     * @var string
-     */
-    private $base_url;
+    private string $baseUrl = '';
 
-    /**
-     * @var string
-     */
-    private $url;
+    private string $url = '';
 
-    /**
-     * @var string
-     */
-    private $full_url;
+    private string $fullUrl = '';
 
-    /**
-     * The route resolver callback.
-     *
-     * @var \Closure
-     */
+    /** @var \Closure|null */
     protected $routeResolver;
 
     /**
-     * @param string $method HTTP method
-     * @param string|UriInterface $uri URI
-     * @param array $headers Request headers
-     * @param string|resource|StreamInterface|null $body Request body
-     * @param string $version Protocol version
+     * @param string                               $method       HTTP method
+     * @param string|UriInterface                  $uri          URI
+     * @param array<string, string|string[]>       $headers      Request headers
+     * @param string|resource|StreamInterface|null $body         Request body
+     * @param string                               $version      Protocol version
+     * @param array<string, mixed>                 $serverParams Server parameters
      */
-    public function __construct($method, $uri, array $headers = [], $body = null, $version = '1.1', array $serverParams = [])
-    {
+    public function __construct(
+        $method,
+        $uri,
+        array $headers = [],
+        $body = null,
+        $version = '1.1',
+        array $serverParams = []
+    ) {
         parent::__construct($method, $uri, $headers, $body, $version, $serverParams);
-        $this->initialize($uri);
+        $this->setBasePath('');
     }
 
     /**
-     * @param string|UriInterface $uri URI
+     * Create a new Request from PHP global variables.
      */
-    private function initialize($uri)
+    public static function create(): static
     {
-        $basePath = env('APP_BASE_PATH', '');
+        $headers = getallheaders() ?: [];
+        $uri = self::getUriFromGlobals();
+        $body = fopen('php://input', 'r') ?: null;
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        $protocol = isset($_SERVER['SERVER_PROTOCOL'])
+            ? str_replace('HTTP/', '', $_SERVER['SERVER_PROTOCOL'])
+            : '1.1';
+
+        return new static($method, $uri, $headers, $body, $protocol, $_SERVER);
+    }
+
+    /**
+     * Alias for create(). Captures the current request.
+     */
+    public static function capture(): static
+    {
+        return static::create();
+    }
+
+    /**
+     * Set the base path for the request.
+     *
+     * @return static
+     */
+    public function setBasePath(string $basePath): static
+    {
+        $uri = $this->getUri();
         $path = trim($basePath, '/');
         $host = $uri->getHost();
         $port = $uri->getPort();
         $query = $uri->getQuery();
 
-        if ($port && !in_array($port, [80, 443])) {
+        if ($port !== null && !in_array($port, [80, 443], true)) {
             $host = $host . ':' . $port;
         }
 
-        $base_uri = ($path) ? $host . '/' . $path : $host;
-        $request_uri = $uri->getPath();
+        $baseUri = $path !== '' ? $host . '/' . $path : $host;
+        $requestUri = $uri->getPath();
 
-        $this->base_path = $basePath;
-        $this->uriPath = str_replace($basePath, '', $uri->getPath());
-        $this->base_url = $uri->getScheme() . '://' . $base_uri;
-        $this->full_url = $this->url = $uri->getScheme() . '://' . $host . $request_uri;
+        $this->basePath = $basePath;
+        $this->uriPath = str_replace($basePath, '', $requestUri);
+        $this->baseUrl = $uri->getScheme() . '://' . $baseUri;
+        $this->fullUrl = $this->url = $uri->getScheme() . '://' . $host . $requestUri;
 
-        if ($query) {
-            $this->full_url = $this->full_url . '?' . $query;
+        if ($query !== '') {
+            $this->fullUrl = $this->url . '?' . $query;
         }
+
+        return $this;
     }
 
     /**
-     * Create new Request
-     *
-     * @return static
+     * Return the request's path information.
      */
-    public static function create()
-    {
-        $headers = getallheaders();
-        $uri = self::getUriFromGlobals();
-        $body = fopen('php://input', 'r') ?: null;
-        $method = isset($_SERVER['REQUEST_METHOD']) ? $_SERVER['REQUEST_METHOD'] : 'GET';
-        $protocol = isset($_SERVER['SERVER_PROTOCOL']) ? str_replace('HTTP/', '', $_SERVER['SERVER_PROTOCOL']) : '1.1';
-
-        return new self($method, $uri, $headers, $body, $protocol, $_SERVER);
-    }
-
-    /**
-     * Return the request's path information
-     */
-    public function path()
+    public function path(): string
     {
         return $this->getUri()->getPath();
     }
 
     /**
      * Get the request method.
-     *
-     * @return string
      */
-    public function method()
+    public function method(): string
     {
         return $this->getMethod();
     }
 
     /**
-     * Verify that the HTTP verb matches a given string
+     * Verify that the HTTP verb matches a given string.
      */
-    public function isMethod(string $method)
+    public function isMethod(string $method): bool
     {
         return $this->getMethod() === strtoupper($method);
     }
 
     /**
-     * Retrieve a message header value by the given case-insensitive name.
+     * Retrieve a single header value by the given case-insensitive name.
+     *
+     * @param mixed $default
+     * @return mixed
      */
     public function header(string $key, $default = null)
     {
         $entries = $this->getHeader($key);
-        return !empty($entries) ? $entries[0] : $default;
+        return $entries !== [] ? $entries[0] : $default;
     }
 
     /**
-     * Retrieve all headers from the request
+     * Retrieve all headers from the request.
+     *
+     * @return array<string, string[]>
      */
-    public function headers()
+    public function headers(): array
     {
         return $this->getHeaders();
     }
 
     /**
-     * Retrieve a bearer token from the Authorization header
+     * Retrieve a bearer token from the Authorization header.
      */
-    public function bearerToken()
+    public function bearerToken(): ?string
     {
-        $header = $this->getHeader('Authorization');
+        $header = $this->getHeaderLine('Authorization');
 
-        if (!$header[0] || strpos($header[0], 'Bearer ') !== 0) {
+        if ($header === '' || !str_starts_with($header, 'Bearer ')) {
             return null;
         }
 
-        return trim(substr($header[0], 7));
+        return trim(substr($header, 7));
     }
 
     /**
      * Get the root URL for the application.
-     *
-     * @return string
      */
-    public function root()
+    public function root(): string
     {
         return rtrim($this->baseUrl(), '/');
     }
 
     /**
-     * Return the URL without the query string
+     * Return the URL without the query string.
      */
     public function url(): string
     {
@@ -177,20 +180,17 @@ class Request extends \Nyholm\Psr7\ServerRequest
     }
 
     /**
-     * Return the URL includes the query string
+     * Return the URL including the query string.
      */
     public function fullUrl(): string
     {
-        return $this->full_url;
+        return $this->fullUrl;
     }
 
     /**
-     * Determine if the current request URI matches a pattern.
-     *
-     * @param  mixed  ...$patterns
-     * @return bool
+     * Determine if the current request URI matches one or more patterns.
      */
-    public function is(...$patterns)
+    public function is(string ...$patterns): bool
     {
         foreach ($patterns as $pattern) {
             if (Str::is($pattern, $this->uriPath)) {
@@ -202,44 +202,42 @@ class Request extends \Nyholm\Psr7\ServerRequest
     }
 
     /**
-     * Return the base url
+     * Return the base URL.
      */
-    public function baseUrl()
+    public function baseUrl(): string
     {
-        return $this->base_url;
+        return $this->baseUrl;
     }
 
     /**
-     * Return the base path
+     * Return the base path.
      */
-    public function basePath()
+    public function basePath(): string
     {
-        return $this->base_path;
+        return $this->basePath;
     }
 
     /**
      * Get the client user agent.
-     *
-     * @return string|null
      */
-    public function userAgent()
+    public function userAgent(): ?string
     {
-        return $this->getHeader('User-Agent');
+        $header = $this->getHeader('User-Agent');
+        return $header !== [] ? $header[0] : null;
     }
 
     /**
      * Get the route handling the request.
      *
-     * @param  string|null  $param
-     * @param  mixed  $default
-     *
-     * @return array|string
+     * @param string|null $param
+     * @param mixed       $default
+     * @return mixed
      */
-    public function route($param = null, $default = null)
+    public function route(?string $param = null, $default = null)
     {
         $route = ($this->getRouteResolver())();
 
-        if (is_null($route) || is_null($param)) {
+        if ($route === null || $param === null) {
             return $route;
         }
 
@@ -249,10 +247,9 @@ class Request extends \Nyholm\Psr7\ServerRequest
     /**
      * Get a unique fingerprint for the request / route / IP address.
      *
-     * @return string
-     * @throws \Horizom\Http\Exceptions\HttpException
+     * @throws HttpException
      */
-    public function fingerprint()
+    public function fingerprint(): string
     {
         if (!$this->route()) {
             throw new HttpException('Unable to generate fingerprint. Route unavailable.');
@@ -267,119 +264,139 @@ class Request extends \Nyholm\Psr7\ServerRequest
     }
 
     /**
-     * Get id address
+     * Get the client IP address.
      *
-     * @return string|null
+     * Checks Cloudflare CF-Connecting-IP, then X-Forwarded-For, then REMOTE_ADDR.
+     * Note: proxy headers can be spoofed — validate against a trusted proxy list in production.
      */
-    public function ip()
+    public function ip(): ?string
     {
-        if ($this->getHeader('http-cf-connecting-ip') !== null) {
-            return $this->getHeader('http-cf-connecting-ip');
+        $cf = $this->getHeaderLine('CF-Connecting-IP');
+        if ($cf !== '') {
+            return $cf;
         }
 
-        if ($this->getHeader('http-x-forwarded-for') !== null) {
-            return $this->getHeader('http-x-forwarded_for');
+        $forwarded = $this->getHeaderLine('X-Forwarded-For');
+        if ($forwarded !== '') {
+            return trim(explode(',', $forwarded)[0]);
         }
 
-        return $this->getHeader('remote-addr');
+        $serverParams = $this->getServerParams();
+        return isset($serverParams['REMOTE_ADDR']) ? (string) $serverParams['REMOTE_ADDR'] : null;
     }
 
     /**
      * Determine if the request is over HTTPS.
-     *
-     * @return bool
      */
-    public function secure()
+    public function secure(): bool
     {
         return $this->isSecure();
     }
 
     /**
-     * Check if request connection is secure
+     * Check if the request connection is secure.
      */
-    public function isSecure()
+    public function isSecure(): bool
     {
-        return $this->getHeader('http-x-forwarded-proto') === 'https' || $this->getHeader('https') !== null || $this->getHeader('server-port') === 443;
+        if ($this->getHeaderLine('X-Forwarded-Proto') === 'https') {
+            return true;
+        }
+
+        $serverParams = $this->getServerParams();
+        $https = $serverParams['HTTPS'] ?? '';
+        $port = isset($serverParams['SERVER_PORT']) ? (int) $serverParams['SERVER_PORT'] : null;
+
+        return (!empty($https) && strtolower((string) $https) !== 'off')
+            || $port === 443;
     }
 
     /**
      * Determine if the request is the result of an AJAX call.
      */
-    public function ajax()
+    public function ajax(): bool
     {
         return $this->isXmlHttpRequest();
     }
 
     /**
-     * Determine if the request is the result of an PJAX call.
+     * Determine if the request is the result of a PJAX call.
      */
-    public function pjax()
+    public function pjax(): bool
     {
-        return (bool) $this->header('X-PJAX');
+        return $this->getHeaderLine('X-PJAX') !== '';
     }
 
     /**
-     * Determine if the request is the result of an AJAX call.
+     * Determine if the request is an XMLHttpRequest.
      */
-    public function isXmlHttpRequest()
+    public function isXmlHttpRequest(): bool
     {
-        $isXhr = false;
-        $headerX = $this->getHeader('http-x-requested-with');
-
-        foreach ($headerX as $value) {
-            $isXhr = strtolower($value) === 'xmlhttprequest';
-            break;
-        }
-
-        return $isXhr;
+        return strtolower($this->getHeaderLine('X-Requested-With')) === 'xmlhttprequest';
     }
 
-    public function isJson()
+    /**
+     * Determine if the request Content-Type is application/json.
+     */
+    public function isJson(): bool
     {
-        return $this->header('content-type') === 'application/json';
+        return str_contains($this->getHeaderLine('Content-Type'), 'application/json');
     }
 
-    public function isHtml()
+    /**
+     * Determine if the request Content-Type is text/html.
+     */
+    public function isHtml(): bool
     {
-        return $this->header('content-type') === 'text/html';
+        return str_contains($this->getHeaderLine('Content-Type'), 'text/html');
     }
 
-    public function wantsJson()
+    /**
+     * Determine if the client expects a JSON response.
+     */
+    public function wantsJson(): bool
     {
-        $accept = $this->header('accept');
-
-        if (empty($accept)) {
-            return false;
-        }
-
-        return strpos($accept, 'application/json') !== false;
+        $accept = $this->getHeaderLine('Accept');
+        return $accept !== '' && str_contains($accept, 'application/json');
     }
 
-    public function exceptJson()
+    /**
+     * Determine if the client does not expect a JSON response.
+     */
+    public function exceptJson(): bool
     {
         return !$this->wantsJson();
     }
 
     /**
      * Get the route resolver callback.
-     *
-     * @return \Closure
      */
-    public function getRouteResolver()
+    public function getRouteResolver(): \Closure
     {
-        return $this->routeResolver ?: function () {
-            //
+        return $this->routeResolver ?? static function (): null {
+            return null;
         };
     }
 
     /**
-     * Get a Uri populated with values from $_SERVER.
+     * Set the route resolver callback.
+     *
+     * @return static
+     */
+    public function setRouteResolver(\Closure $callback): static
+    {
+        $this->routeResolver = $callback;
+        return $this;
+    }
+
+    /**
+     * Build a Uri populated with values from $_SERVER.
      */
     public static function getUriFromGlobals(): UriInterface
     {
         $uri = new Uri('');
-
-        $uri = $uri->withScheme(!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http');
+        $uri = $uri->withScheme(
+            !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http'
+        );
 
         $hasPort = false;
         if (isset($_SERVER['HTTP_HOST'])) {
@@ -387,7 +404,6 @@ class Request extends \Nyholm\Psr7\ServerRequest
             if ($host !== null) {
                 $uri = $uri->withHost($host);
             }
-
             if ($port !== null) {
                 $hasPort = true;
                 $uri = $uri->withPort($port);
@@ -399,7 +415,7 @@ class Request extends \Nyholm\Psr7\ServerRequest
         }
 
         if (!$hasPort && isset($_SERVER['SERVER_PORT'])) {
-            $uri = $uri->withPort($_SERVER['SERVER_PORT']);
+            $uri = $uri->withPort((int) $_SERVER['SERVER_PORT']);
         }
 
         $hasQuery = false;
@@ -419,17 +435,16 @@ class Request extends \Nyholm\Psr7\ServerRequest
         return $uri;
     }
 
+    /**
+     * @return array{0: string|null, 1: int|null}
+     */
     private static function extractHostAndPortFromAuthority(string $authority): array
     {
-        $uri = 'http://' . $authority;
-        $parts = parse_url($uri);
-        if (false === $parts) {
+        $parts = parse_url('http://' . $authority);
+        if ($parts === false) {
             return [null, null];
         }
 
-        $host = $parts['host'] ?? null;
-        $port = $parts['port'] ?? null;
-
-        return [$host, $port];
+        return [$parts['host'] ?? null, $parts['port'] ?? null];
     }
 }

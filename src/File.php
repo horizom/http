@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http;
 
 use Symfony\Component\HttpFoundation\File\File as SymfonyFile;

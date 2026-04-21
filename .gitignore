@@ -6,7 +6,6 @@
 /.vscode
 /node_modules
 /vendor
-/tests
 
 npm-debug.log
 yarn-error.log

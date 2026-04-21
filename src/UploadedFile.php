@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http;
 
 use Horizom\Http\Exceptions\FileNotFoundException;
@@ -15,13 +17,18 @@ class UploadedFile extends \Symfony\Component\HttpFoundation\File\UploadedFile
      *
      * @throws FileNotFoundException
      */
-    public function get()
+    public function get(): string
     {
         if (!$this->isValid()) {
             throw new FileNotFoundException("File does not exist at path {$this->getPathname()}.");
         }
 
-        return file_get_contents($this->getPathname());
+        $contents = file_get_contents($this->getPathname());
+        if ($contents === false) {
+            throw new FileNotFoundException("Unable to read file at path {$this->getPathname()}.");
+        }
+
+        return $contents;
     }
 
     /**
@@ -29,9 +36,9 @@ class UploadedFile extends \Symfony\Component\HttpFoundation\File\UploadedFile
      *
      * @return string
      */
-    public function clientExtension()
+    public function clientExtension(): string
     {
-        return $this->guessClientExtension();
+        return $this->guessClientExtension() ?? '';
     }
 
     /**
@@ -41,7 +48,7 @@ class UploadedFile extends \Symfony\Component\HttpFoundation\File\UploadedFile
      * @param  bool  $test
      * @return static
      */
-    public static function createFromBase(UploadedFile $file, $test = false)
+    public static function createFromBase(UploadedFile $file, bool $test = false): static
     {
         return $file instanceof static ? $file : new static(
             $file->getPathname(),
@@ -55,10 +62,10 @@ class UploadedFile extends \Symfony\Component\HttpFoundation\File\UploadedFile
     /**
      * Parse and format the given options.
      *
-     * @param  array|string  $options
-     * @return array
+     * @param array<string, mixed>|string $options
+     * @return array<string, mixed>
      */
-    protected function parseOptions($options)
+    protected function parseOptions(array|string $options): array
     {
         if (is_string($options)) {
             $options = ['disk' => $options];

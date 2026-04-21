@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http\Collection;
 
 use Illuminate\Support\Collection;
@@ -47,41 +49,29 @@ class ServerCollection extends Collection
      */
 
     /**
-     * Quickly check if a string has a passed prefix
-     *
-     * @param string $string    The string to check
-     * @param string $prefix    The prefix to test
-     * @return boolean
+     * Quickly check if a string has the given prefix.
      */
-    public static function hasPrefix($string, $prefix)
+    public static function hasPrefix(string $string, string $prefix): bool
     {
-        if (strpos($string, $prefix) === 0) {
-            return true;
-        }
-
-        return false;
+        return str_starts_with($string, $prefix);
     }
 
     /**
-     * Get our headers from our server data collection
+     * Get HTTP headers from the server data collection.
      *
-     * PHP is weird... it puts all of the HTTP request
-     * headers in the $_SERVER array. This handles that
+     * PHP stores HTTP request headers in $_SERVER with the HTTP_ prefix.
+     * This method normalises them back to standard header names.
      *
-     * @return array
+     * @return array<string, mixed>
      */
-    public function getHeaders()
+    public function getHeaders(): array
     {
-        // Define a headers array
-        $headers = array();
+        $headers = [];
 
-        foreach ($this->attributes as $key => $value) {
-            // Does our server attribute have our header prefix?
+        foreach ($this->all() as $key => $value) {
             if (self::hasPrefix($key, self::$http_header_prefix)) {
-                // Add our server attribute to our header array
                 $headers[substr($key, strlen(self::$http_header_prefix))] = $value;
-            } elseif (in_array($key, self::$http_nonprefixed_headers)) {
-                // Add our server attribute to our header array
+            } elseif (in_array($key, self::$http_nonprefixed_headers, true)) {
                 $headers[$key] = $value;
             }
         }

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Horizom\Http\Collection;
 
 use Horizom\Http\UploadedFile;
@@ -22,16 +24,16 @@ class FileCollection extends Collection
     /**
      * {@inheritdoc}
      */
-    public function replace(array $files = [])
+    public function replace($files = [])
     {
-        $this->parameters = [];
+        $this->items = [];
         $this->add($files);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function set(string $key, $value)
+    public function set(string $key, mixed $value): void
     {
         if (!\is_array($value) && !$value instanceof UploadedFile) {
             throw new \InvalidArgumentException('An uploaded file must be an array or an instance of UploadedFile.');
@@ -43,7 +45,7 @@ class FileCollection extends Collection
     /**
      * {@inheritdoc}
      */
-    public function add(array $files = [])
+    public function add($files = [])
     {
         foreach ($files as $key => $file) {
             $this->set($key, $file);
