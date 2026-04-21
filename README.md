@@ -1,5 +1,9 @@
 # horizom/http
 
+[![Total Downloads](https://poser.pugx.org/horizom/http/d/total.svg)](https://packagist.org/packages/horizom/http)
+[![Latest Stable Version](https://poser.pugx.org/horizom/http/v/stable.svg)](https://packagist.org/packages/horizom/http)
+[![License](https://poser.pugx.org/horizom/http/license.svg)](https://packagist.org/packages/horizom/http)
+
 A PSR-7 HTTP abstraction layer for PHP 8.0+, built on top of [Nyholm/PSR7](https://github.com/Nyholm/psr7) and [Symfony HttpFoundation](https://symfony.com/doc/current/components/http_foundation.html). Provides a rich, expressive API for working with HTTP requests, responses, URIs, streams, and file uploads.
 
 ---
